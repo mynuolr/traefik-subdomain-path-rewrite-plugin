@@ -12,10 +12,10 @@ type Log struct {
 	logDebug *log.Logger
 }
 
-func New(logLevel string) *Log {
-	logError := log.New(io.Discard, "ERROR: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logInfo := log.New(io.Discard, "INFO: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
-	logDebug := log.New(io.Discard, "DEBUG: CrowdsecBouncerTraefikPlugin: ", log.Ldate|log.Ltime)
+func New(logLevel string, prefix string) *Log {
+	logError := log.New(io.Discard, "ERROR: "+prefix, log.Ldate|log.Ltime)
+	logInfo := log.New(io.Discard, "INFO: "+prefix, log.Ldate|log.Ltime)
+	logDebug := log.New(io.Discard, "DEBUG: "+prefix, log.Ldate|log.Ltime)
 
 	switch logLevel {
 	case "DEBUG":

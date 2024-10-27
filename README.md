@@ -16,6 +16,7 @@ The plugin accepts the following configuration parameters:
 
 - `replacementHost` (optional): The host to replace the original request host. If not provided, the host will remain unchanged.
 - `basePath` (optional): A base path to prepend to the rewritten URL.
+- `keepPath` (optional): Decides if the original request path will be appended to the rewritten URL, default is `true`.
 - `logLevel` (optional): Sets the logging level, default is `INFO`.
 
 ### Example Configuration
@@ -28,6 +29,7 @@ http:
         traefik_dynamic_rewrite_plugin:
           replacementHost: "example.com"
           basePath: "/service"
+          keepPah: true
           logLevel: "DEBUG"
 ```
 

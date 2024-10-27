@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	typeName           = "DynamicRewrite"
+	typeName           = "SubdomainPathRewrite"
 	ReplacedPathHeader = "X-Replaced-Path"
 	ReplacedHostHeader = "X-Replaced-Host"
 )
@@ -20,6 +20,7 @@ const (
 type Config struct {
 	ReplacementHost string `json:"replacementHost,omitempty"`
 	BasePath        string `json:"basePath,omitempty"`
+	KeepPath        bool   `json:"keepPath,omitempty"`
 	LogLevel        string `json:"logLevel,omitempty"`
 }
 
@@ -27,6 +28,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		LogLevel: "INFO",
+		KeepPath: true,
 	}
 }
 
@@ -36,13 +38,14 @@ type DynamicRewrite struct {
 	name            string
 	replacementHost string
 	basePath        string
+	keepPath        bool
 	hostRegex       *regexp.Regexp
 	log             *logger.Log
 }
 
 // New creates a new replace path middleware.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	log := logger.New(config.LogLevel)
+	log := logger.New(config.LogLevel, fmt.Sprintf("[%s] ", typeName))
 
 	hostRegex, err := regexp.Compile(`^(?P<identifier>[^\.]+)\..+$`)
 	if err != nil {
@@ -58,6 +61,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		name:            name,
 		replacementHost: config.ReplacementHost,
 		basePath:        config.BasePath,
+		keepPath:        config.KeepPath,
 		hostRegex:       hostRegex,
 		log:             log,
 	}, nil
@@ -65,12 +69,15 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 func (dr *DynamicRewrite) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := req.Host
-	dr.log.Info("[DynamicRewrite] Original Host: %s", host)
+	dr.log.Info("Original Host: %s", host)
+	dr.log.Info("Original Path: %s", req.URL.Path)
+	dr.log.Info("Original URL: %s", req.URL.String())
 
 	matches := dr.hostRegex.FindStringSubmatch(host)
 	if len(matches) > 1 {
 		dynamicIdentifier := matches[1]
-		dr.log.Info("[DynamicRewrite] Dynamic Identifier: %s", dynamicIdentifier)
+		baseHost := host[len(dynamicIdentifier)+1:]
+		dr.log.Info("Dynamic Identifier: %s", dynamicIdentifier)
 
 		currentPath := req.URL.RawPath
 		if currentPath == "" {
@@ -80,15 +87,26 @@ func (dr *DynamicRewrite) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		originalURL := req.URL.String()
 
+		var newHost string
 		if dr.replacementHost != "" {
-			if len(req.URL.Host) > 0 {
-				req.URL.Host = dr.replacementHost
-			}
-			req.Host = dr.replacementHost
-			req.Header.Add(ReplacedHostHeader, host)
+			newHost = dr.replacementHost
+		} else {
+			newHost = baseHost
 		}
 
-		req.URL.RawPath = fmt.Sprintf("%s/%s%s", dr.basePath, dynamicIdentifier, currentPath)
+		if len(req.URL.Host) > 0 {
+			req.URL.Host = newHost
+		}
+		req.Host = newHost
+		req.Header.Add(ReplacedHostHeader, host)
+
+		dr.log.Info("Rewritten Host from %s to %s", host, newHost)
+
+		newPath := fmt.Sprintf("%s/%s", dr.basePath, dynamicIdentifier)
+		if dr.keepPath {
+			newPath += currentPath
+		}
+		req.URL.RawPath = newPath
 
 		var err error
 		req.URL.Path, err = url.PathUnescape(req.URL.RawPath)
@@ -98,11 +116,13 @@ func (dr *DynamicRewrite) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		dr.log.Info("Rewritten Path from %s to %s", currentPath, req.URL.Path)
+
 		req.RequestURI = req.URL.RequestURI()
 
-		dr.log.Info("[DynamicRewrite] Rewritten URL from %s to %s", originalURL, req.URL.String())
+		dr.log.Info("Rewritten URL from %s to %s", originalURL, req.URL.String())
 	} else {
-		dr.log.Info("[DynamicRewrite] No dynamic identifier found in host: %s", host)
+		dr.log.Info("No dynamic identifier found in host: %s", host)
 	}
 	dr.next.ServeHTTP(rw, req)
 }
