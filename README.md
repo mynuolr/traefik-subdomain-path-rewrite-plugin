@@ -21,12 +21,24 @@ The plugin accepts the following configuration parameters:
 
 ### Example Configuration
 
+#### Static Configuration
+
+```yaml
+experimental:
+  plugins:
+    traefik-subdomain-path-rewrite-plugin:
+      moduleName: "github.com/lukas-r/traefik-subdomain-path-rewrite-plugin"
+      version: "v0.2.0"
+```
+
+#### Dynamic Configuration
+
 ```yaml
 http:
   middlewares:
     my-dynamic-rewrite:
       plugin:
-        traefik_dynamic_rewrite_plugin:
+        traefik-subdomain-path-rewrite-plugin:
           replacementHost: "example.com"
           basePath: "/service"
           keepPah: true
