@@ -28,7 +28,7 @@ experimental:
   plugins:
     traefik-subdomain-path-rewrite-plugin:
       moduleName: "github.com/lukas-r/traefik-subdomain-path-rewrite-plugin"
-      version: "v0.2.0"
+      version: "v0.2.1"
 ```
 
 #### Dynamic Configuration
