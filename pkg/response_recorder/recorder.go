@@ -6,12 +6,14 @@ import "net/http"
 type ResponseRecorder struct {
 	StatusCode int
 	Body       []byte
+	header     http.Header
 }
 
 func New() *ResponseRecorder {
 	return &ResponseRecorder{
 		StatusCode: http.StatusOK,
 		Body:       []byte{},
+		header:     http.Header{},
 	}
 }
 
@@ -27,5 +29,5 @@ func (rec *ResponseRecorder) Write(body []byte) (int, error) {
 }
 
 func (rec *ResponseRecorder) Header() http.Header {
-	return http.Header{}
+	return rec.header
 }

@@ -229,12 +229,14 @@ func (dr *DynamicRewrite) respondWithFallback(rw http.ResponseWriter, req *http.
 	proxy := &httputil.ReverseProxy{Director: func(r *http.Request) {}}
 	newReq, _ := http.NewRequest(req.Method, fallbackURL.String(), req.Body)
 	newReq.Header = req.Header.Clone()
-	dr.log.Info("Fallback Headers %+v", newReq.Header)
 	newReq.Header.Set(FallbackURLHeader, req.URL.String())
 	proxy.ServeHTTP(rw, newReq)
 }
 
 func (dr *DynamicRewrite) respondWithOriginal(rw http.ResponseWriter, recorder *response_recorder.ResponseRecorder) {
+	for key, values := range recorder.Header() {
+		rw.Header()[key] = values
+	}
 	rw.WriteHeader(recorder.StatusCode)
 	rw.Write(recorder.Body)
 }
