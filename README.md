@@ -1,63 +1,135 @@
+# Traefik Subdomain Path Rewrite Plugin
 
-# Traefik Subdomain to Path Rewrite Plugin
-
-This Traefik plugin allows dynamic rewriting of incoming request URLs by modifying the host and path based on specified configurations. Specifically, it is designed to rewrite subdomains into paths, enabling more flexible routing. It uses regular expression-based dynamic URL rewriting, which can be customized for various routing needs in a Traefik reverse proxy setup.
+This plugin for Traefik enables dynamic path rewriting based on subdomains and provides fallback capabilities for handling 404 responses. It's particularly useful for scenarios where you want to map subdomain-based URLs to path-based routes while maintaining flexibility in URL structure.
 
 ## Features
 
-- **Dynamic Host Replacement**: Replace the host of incoming requests based on a regex pattern.
-- **Path Rewriting**: Rewrite the URL path by adding a configurable base path along with an identifier extracted from the host.s
-- **Custom Headers**: Adds custom headers `X-Replaced-Path` and `X-Replaced-Host` for tracking original values.
-- **Logging Support**: Adjustable log level for detailed debug information.
+- Rewrite subdomain-based URLs to path-based routes
+- Optional path preservation after rewriting
+- Configurable base path for all rewrites
+- Custom host replacement
+- Fallback path handling for 404 responses
+- Detailed request tracking through custom headers
 
 ## Configuration
 
-The plugin accepts the following configuration parameters:
+### Static Configuration
 
-- `replacementHost` (optional): The host to replace the original request host. If not provided, the host will remain unchanged.
-- `basePath` (optional): A base path to prepend to the rewritten URL.
-- `keepPath` (optional): Decides if the original request path will be appended to the rewritten URL, default is `true`.
-- `logLevel` (optional): Sets the logging level, default is `INFO`.
-
-### Example Configuration
-
-#### Static Configuration
+Static configuration is defined in your Traefik installation and enables the plugin. This is typically done in your `traefik.yml` file or through environment variables.
 
 ```yaml
 experimental:
   plugins:
-    traefik-subdomain-path-rewrite-plugin:
+    subdomainPathRewrite:
       moduleName: "github.com/lukas-r/traefik-subdomain-path-rewrite-plugin"
-      version: "v0.2.1"
+      version: "v0.3.0"
 ```
 
-#### Dynamic Configuration
+### Dynamic Configuration
+
+Dynamic configuration can be modified at runtime and controls the plugin's behavior for specific routers.
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| rewriteSubdomain | bool | true | Enable/disable subdomain extraction and rewriting |
+| replacementHost | string | "" | Override the target host. If empty, uses the base domain |
+| basePath | string | "" | Base path prefix for all rewritten URLs |
+| keepPath | bool | true | Preserve the original path after the rewritten portion |
+| fallbackPath | string | "" | Path to try when original request returns 404 |
+| logLevel | string | "INFO" | Logging level (INFO, DEBUG, ERROR) |
+
+#### Detailed Parameter Behavior
+
+##### rewriteSubdomain
+
+- When `true`: Extracts the first subdomain segment and uses it in the path rewrite
+- When `false`: No subdomain extraction occurs, other rewrite rules still apply
+- Example: With `true`, `customer.example.com` becomes `example.com/customer`
+- Subdomain extraction uses regex to capture everything before the first dot
+
+##### replacementHost
+
+- If set: Replaces the entire host with this value
+- If empty: Uses the original host minus the extracted subdomain
+- Example: With `replacementHost: "api.internal"`, `customer.example.com` becomes `api.internal`
+- Useful for routing to internal services or different domains
+
+##### basePath
+
+- Prefixed to all rewritten paths
+- If provided without leading slash, one is automatically added
+- Applies before the subdomain segment in the final path
+- Example: With `basePath: "/api"`, the path becomes `/api/customer/...`
+
+##### keepPath
+
+- When `true`: Preserves the original request path after the rewritten portion
+- When `false`: Only uses the rewritten portion, ending with a slash
+- Example with `true`: `/original/path` becomes `/api/customer/original/path`
+- Example with `false`: `/original/path` becomes `/api/customer/`
+
+##### fallbackPath
+
+The fallbackPath parameter has two distinct behaviors based on whether it starts with a slash:
+
+1. Absolute Path (starts with slash):
+   - Appended to the base rewritten path
+   - Original path is completely ignored
+   - Example:
+     - `fallbackPath: "/default"`
+     - Original: `customer.example.com/not/found`
+     - Fallback: `example.com/api/customer/default`
+
+2. Relative Path (no starting slash):
+   - Replaces only the last segment of the original path
+   - Preserves the rest of the path structure
+   - Example:
+     - `fallbackPath: "default"`
+     - Original: `customer.example.com/products/not-found`
+     - Fallback: `example.com/api/customer/products/default`
+
+##### logLevel
+
+- "INFO": Standard operational logging
+- "DEBUG": Detailed request/response information
+- "ERROR": Only error conditions
+- Affects the verbosity of plugin logs
+
+### Example Configuration (Docker Labels)
 
 ```yaml
-http:
-  middlewares:
-    my-dynamic-rewrite:
-      plugin:
-        traefik-subdomain-path-rewrite-plugin:
-          replacementHost: "example.com"
-          basePath: "/service"
-          keepPah: true
-          logLevel: "DEBUG"
+services:
+  my-service:
+    labels:
+      - "traefik.enable=true"
+      # Enable the plugin for this router
+      - "traefik.http.routers.my-service.middlewares=subdomain-rewrite"
+      - "traefik.http.middlewares.subdomain-rewrite.plugin.subdomainPathRewrite.rewriteSubdomain=true"
+      - "traefik.http.middlewares.subdomain-rewrite.plugin.subdomainPathRewrite.basePath=/api"
+      - "traefik.http.middlewares.subdomain-rewrite.plugin.subdomainPathRewrite.keepPath=true"
+      - "traefik.http.middlewares.subdomain-rewrite.plugin.subdomainPathRewrite.fallbackPath=/default"
 ```
 
-## Routing Example
+## URL Rewriting Examples
 
-The following table illustrates example routings based on the configuration above:
+Based on the example configuration above, here's how different URLs would be rewritten:
 
-| Original URL                | Rewritten URL                        |
-|-----------------------------|--------------------------------------|
-| `http://foo.mypage.org/`    | `http://example.com/service/foo/`    |
-| `http://bar.mypage.org/`    | `http://example.com/service/bar/`    |
-| `http://baz.example.com/abc`| `http://example.com/service/baz/abc` |
+| Original URL | Rewritten URL | Notes |
+|-------------|---------------|--------|
+| `customer1.example.com/users` | `example.com/api/customer1/users` | Subdomain becomes path segment |
+| `customer2.example.com/` | `example.com/api/customer2/` | Minimal path case |
+| `customer3.example.com/orders/123` | `example.com/api/customer3/orders/123` | Complex path preservation |
+| `customer4.example.com/products/not-found` | `example.com/api/customer4/default` | Absolute fallback path (`/default`) |
+| `customer5.example.com/catalog/missing` | `example.com/api/customer5/catalog/default` | Relative fallback path (`default`) |
 
-## Headers Added
+## Headers
 
-The middleware adds two headers to the request:
+The plugin adds several headers to track the rewriting process:
 
-- **`X-Replaced-Path`**: The original path before rewrite.
-- **`X-Replaced-Host`**: The original host before rewrite.
+- `X-Replaced-Path`: Original path before rewriting
+- `X-Replaced-Host`: Original host before rewriting
+- `X-Fallback-For`: Original URL when serving fallback content
+
+These headers are useful for debugging and understanding how requests are being transformed by the plugin.
