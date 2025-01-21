@@ -210,7 +210,7 @@ func (dr *DynamicRewrite) constructFallbackURL(req *http.Request, internalBasePa
 }
 
 func (dr *DynamicRewrite) getFallbackPath(originalPath string, internalBasePath string) string {
-	if dr.fallbackPathComponent[0] != '/' {
+	if len(dr.fallbackPathComponent) > 0 && dr.fallbackPathComponent[0] != '/' {
 		pathParts := strings.Split(originalPath, "/")
 		pathParts[len(pathParts)-1] = dr.fallbackPathComponent
 		return strings.Join(pathParts, "/")
