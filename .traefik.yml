@@ -2,7 +2,7 @@
 displayName: "Subdomain to Path Rewrite Plugin"
 type: "middleware"
 
-import: "github.com/lukas-r/traefik-subdomain-path-rewrite-plugin"
+import: "github.com/mynuolr/traefik-subdomain-path-rewrite-plugin"
 
 summary: "A Traefik middleware plugin to rewrite subdomains to paths dynamically."
 
